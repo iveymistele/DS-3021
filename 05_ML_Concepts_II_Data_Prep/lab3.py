@@ -80,6 +80,54 @@ Train, Remaining = train_test_split(college_data1,  train_size = 55, stratify = 
 
 Tune, Test = train_test_split(Remaining,  train_size = .5, stratify= Remaining['target'])
 
+# combine into a single function
+def college_data_pipeline(college_data):
+    # Convert to categorical types
+    cols = ["level", "control"]
+    college_data[cols] = college_data[cols].astype('category')
+
+    # One-hot encoding
+    category_list = list(college_data.select_dtypes('category'))
+    college_data1 = pd.get_dummies(college_data, columns=category_list)
+
+    # Normalize continuous variables
+    continuous_vars = ["long_x", "lat_y", "awards_per_value", "awards_per_state_value", "awards_per_natl_value",
+                       "exp_award_value", "exp_award_state_value", "exp_award_natl_value", "exp_award_percentile",
+                       "ft_pct", "fte_value", "fte_percentile"]
+    scaler = MinMaxScaler()
+    normalized_vars = scaler.fit_transform(college_data1[continuous_vars])
+    college_data1[continuous_vars] = normalized_vars
+
+    # Drop columns
+    columns_to_drop = [
+        'chronname', 'city', 'state', 'site', 'nicknames',  # Location and name
+        'basic', 'hbcu', 'flagship', 'similar',  
+        'vsa_grad_elsewhere_after6_first', 'vsa_enroll_after6_first', 'vsa_enroll_elsewhere_after6_first', 
+        'vsa_grad_after4_transfer', 'vsa_grad_elsewhere_after4_transfer', 'vsa_enroll_after4_transfer', 
+        'vsa_enroll_elsewhere_after4_transfer', 'vsa_grad_after6_transfer', 'vsa_grad_elsewhere_after6_transfer', 
+        'vsa_enroll_after6_transfer', 'vsa_enroll_elsewhere_after6_transfer',  
+        'cohort_size',  
+        'state_sector_ct', 'carnegie_ct'
+    ]
+    college_data1 = college_data1.drop(columns=columns_to_drop)
+
+    # target var
+    threshold = college_data1['awards_per_value'].median()
+    college_data1['target'] = (college_data1['awards_per_value'] > threshold).astype(int)
+
+    # prevalence
+    target_prevalence = college_data1['target'].value_counts(normalize=True)
+    print(target_prevalence)
+
+    # Train tune test
+    Train, Remaining = train_test_split(college_data1, train_size=0.55, stratify=college_data1['target'])
+    Tune, Test = train_test_split(Remaining, train_size=0.5, stratify=Remaining['target'])
+
+    return Train, Tune, Test, college_data1
+
+
+
+
 # Step 3: Concerns
 # The dataset has a wide variety of useful columns that can help address the problem. It has many different metrics on awards,
 # which can help speak to the prestige of the institution. Additionally, the prevalence of the target variable is very
@@ -144,6 +192,38 @@ prevalence2 = placement_data['targetV'].value_counts(normalize=True)
 # train-test split 
 Train, Test = train_test_split(placement_data, train_size=0.8, stratify=placement_data['targetV'])
 Tune, Test = train_test_split(Test, train_size=0.5, stratify=Test['targetV'])
+
+def placement_data_pipeline(placement_data):
+    cat_cols = ["gender", "workex", "specialisation"]
+    placement_data[cat_cols] = placement_data[cat_cols].astype('category')
+
+    # One-hot encoding
+    placement_data = pd.get_dummies(placement_data, columns=cat_cols)
+
+    # Normalize continuous variables
+    cont_vars = ["ssc_p", "hsc_p", "degree_p", "etest_p", "mba_p"]
+    scaler = MinMaxScaler()
+    norm_vars = scaler.fit_transform(placement_data[cont_vars])
+    placement_data[cont_vars] = norm_vars
+
+    # Drop vars
+    drops = ['sl_no', 'ssc_b', 'hsc_b', 'hsc_s', 'degree_t', 'status']
+    placement_data = placement_data.drop(columns=drops)
+
+    # target var
+    salary_threshold = placement_data['salary'].median()
+    placement_data['targetV'] = (placement_data['salary'] > salary_threshold).astype(int)
+
+    # Prevalence 
+    prevalence2 = placement_data['targetV'].value_counts(normalize=True)
+    print(prevalence2)
+    # Train, Tune, test partitions
+    Train, Test = train_test_split(placement_data, train_size=0.8, stratify=placement_data['targetV'])
+    Tune, Test = train_test_split(Test, train_size=0.5, stratify=Test['targetV'])
+
+    return Train, Tune, Test, placement_data
+
+
 
 # Step 3: Concerns
 # I think this data can somewhat address the problem but it may
